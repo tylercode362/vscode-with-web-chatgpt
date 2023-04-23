@@ -9,17 +9,20 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
-    if (this._view) {
-      return;
-    }
-
     this._view = webviewView;
 
     webviewView.webview.options = {
-      enableScripts: true,
+        enableScripts: true,
     };
-
     webviewView.webview.html = this.generateWebviewContent();
+
+    // 添加一个事件监听器，当 webview 面板可见时，加载缓存的消息
+    webviewView.onDidChangeVisibility(() => {
+        if (webviewView.visible) {
+            this.loadCachedMessages();
+        }
+    });
+
     this.loadCachedMessages();
   }
 
