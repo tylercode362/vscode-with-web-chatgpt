@@ -27,15 +27,39 @@
     "GPT-4"
   ],
   "activationEvents": [
+    "onCommand:vscode-web-chatgpt.openPanel",
     "onCommand:vscode-web-chatgpt.explainCode",
     "onCommand:vscode-web-chatgpt.refactorCode",
     "onCommand:vscode-web-chatgpt.documentationCode",
     "onCommand:vscode-web-chatgpt.findBugs",
-    "onCommand:vscode-web-chatgpt.rememberCode"
+    "onCommand:vscode-web-chatgpt.rememberCode",
+    "onCommand:vscode-web-chatgpt.askQuestion"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "web-chatgpt-container",
+          "title": "Web ChatGPT",
+          "icon": "media/G.svg"
+        }
+      ]
+    },
+    "views": {
+      "web-chatgpt-container": [
+        {
+          "id": "web-chatgpt-panel",
+          "name": "Web ChatGPT",
+          "type": "webview"
+        }
+      ]
+    },
     "commands": [
+      {
+        "command": "vscode-web-chatgpt.openPanel",
+        "title": "ChatGPT Open Panel"
+      },
       {
         "command": "vscode-web-chatgpt.explainCode",
         "title": "ChatGPT Explain"
@@ -62,6 +86,13 @@
       }
     ],
     "menus": {
+      "view/item/context": [
+        {
+          "command": "vscode-web-chatgpt.openPanel",
+          "when": "view == web-chatgpt",
+          "group": "navigation"
+        }
+      ],
       "editor/context": [
         {
           "command": "vscode-web-chatgpt.explainCode",
