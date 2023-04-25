@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
+import createDOMPurify from 'dompurify';
+import { JSDOM } from 'jsdom';
+
+const window = new JSDOM('').window;
+const DOMPurify = createDOMPurify(window);
+
 class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private messageCache: any[] = [];
@@ -8,22 +14,43 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     this.messageCache = this._globalState.get("messageCache") || [];
   }
 
+  public clearMessageCache() {
+    this.messageCache = [];
+    this._globalState.update("messageCache", this.messageCache);
+
+    if (this._view) {
+      this._view.webview.postMessage({ type: 'clearMessages' });
+    }
+  }
+
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this._view = webviewView;
 
     webviewView.webview.options = {
         enableScripts: true,
     };
-    webviewView.webview.html = this.generateWebviewContent();
 
-    // 添加一个事件监听器，当 webview 面板可见时，加载缓存的消息
+    if (!webviewView.webview.html) {
+      webviewView.webview.html = this.generateWebviewContent();
+    }
+
     webviewView.onDidChangeVisibility(() => {
         if (webviewView.visible) {
-            this.loadCachedMessages();
+          this.loadCachedMessages();
         }
     });
 
     this.loadCachedMessages();
+  }
+
+  private sanitizeHTML(unsafeHTML: string): string {
+    const allowedTags = ['div', 'code', 'p', 'br', 'ul', 'li', 'pre'];
+    const allowedAttributes = ['class'];
+
+    return DOMPurify.sanitize(unsafeHTML, {
+      ALLOWED_TAGS: allowedTags,
+      ALLOWED_ATTR: allowedAttributes,
+    });
   }
 
   private generateWebviewContent() {
@@ -68,8 +95,9 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
 
         window.addEventListener('message', event => {
           const message = event.data;
-
-          if (message.type === 'showThinking') {
+          if (message.type === 'clearMessages') {
+            clearMessages();
+          } else if (message.type === 'showThinking') {
             showThinking();
           } else if (message.type === 'hideThinking') {
             hideThinking();
@@ -77,13 +105,16 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
             const messageDiv = document.createElement('div');
             messageDiv.className = message.type;
             messageDiv.innerHTML = message.type === 'sent'
-              ? \`<strong>Me:</strong> <span class="timestamp">(\${message.timestamp})</span><br><p>Action: \${message.action}</p>\${message.code ? \`<div class="code" onclick="toggleExpand(this)">\${message.code}</div>\` : ''}\${message.fileName ? \`<p>File: \${message.fileName}</p>\` : ''}\`
-              : \`<strong>ChatGPT:</strong> <span class="timestamp">(\${message.timestamp})</span><br><p>\${message.content}</p>\`;
-            document.getElementById('messages').appendChild(messageDiv);
+            ? \`<strong>Me:</strong> <span class="timestamp">(\${message.timestamp})</span><br><p>Action: \${message.action}</p>\${message.fileName ? \`<p>File: \${message.fileName}</p>\` : ''}\${message.code ? \`<div class="code" onclick="toggleExpand(this)">\${message.code}</div>\` : ''}\`
+            : \`<strong>ChatGPT:</strong> <span class="timestamp">(\${message.timestamp})</span><br><p>\${message.content}</p>\`;            document.getElementById('messages').appendChild(messageDiv);
 
             window.scrollTo(0, document.body.scrollHeight);
           }
         });
+
+        function clearMessages() {
+          document.getElementById('messages').innerHTML = '';
+        }
 
         function showThinking() {
           const thinkingDiv = document.getElementById('thinking');
@@ -158,7 +189,11 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     const responseTimestamp = new Date().toLocaleTimeString();
 
     if (response.data && response.data.data) {
-      const receivedMessage = { type: 'received', content: response.data.data, timestamp: responseTimestamp };
+      const receivedMessage = {
+        type: 'received',
+        content: this.sanitizeHTML(response.data.data),
+        timestamp: responseTimestamp,
+      };
 
       this.messageCache.push(receivedMessage);
       this._globalState.update("messageCache", this.messageCache);
@@ -240,6 +275,12 @@ export function activate(context: vscode.ExtensionContext) {
           viewProvider.sendCodeAndDisplayResult(question);
         }
       });
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('vscode-web-chatgpt.clearMessageCache', () => {
+      viewProvider.clearMessageCache();
     })
   );
 }
