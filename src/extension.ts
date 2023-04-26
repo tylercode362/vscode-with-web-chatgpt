@@ -14,6 +14,13 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     this.messageCache = this._globalState.get("messageCache") || [];
   }
 
+  public handleWebviewMessage(message: any) {
+    if (message.type === 'inputBoxMessage') {
+      this.openPanel();
+      this.sendCodeAndDisplayResult(message.content);
+    }
+  }
+
   public clearMessageCache() {
     this.messageCache = [];
     this._globalState.update("messageCache", this.messageCache);
@@ -40,6 +47,10 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
         }
     });
 
+    webviewView.webview.onDidReceiveMessage((message) => {
+      this.handleWebviewMessage(message);
+    });
+
     this.loadCachedMessages();
   }
 
@@ -61,40 +72,143 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        body {
-          font-family: sans-serif;
-        }
         .sent {
-          background-color: #404040;
-          color: #0000b3;
+          background-color: #262626;
+          color: #bbbbbb;
           padding: 10px;
           border-radius: 5px;
           margin-bottom: 5px;
         }
         .received {
-          background-color: #262626;
+          background-color: #404040;
           padding: 10px;
           border-radius: 5px;
-          color: #8080ff;
+          color: #bbbbbb;
         }
+
         .code {
+          position: relative;
           display: block;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           background-color: black;
           color: #cccccc;
+          padding: 5px;
+          height: 40px;
         }
+
+        .code.expanded {
+          white-space: pre-wrap;
+          height: auto;
+        }
+
+        .expand-collapse {
+          position: absolute;
+          top: 5px;
+          right: 5px;
+          cursor: pointer;
+          display: block;
+          background-color: #333333;
+          color: #cccccc;
+          padding: 0 5px;
+        }
+
+        .expand-collapse:hover {
+          background-color: #555555;
+        }
+
         .timestamp {
           font-size: 0.8em;
           color: #999;
         }
+
+        body {
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+        }
+
+        #messages {
+          height: calc(100% - 100px);
+          overflow-y: scroll;
+          padding: 0 10px;
+          padding-bottom: 20px;
+          box-sizing: border-box;
+        }
+
+        #input-box-container {
+          display: flex;
+          justify-content: space-between;
+          align-items: stretch;
+          position: fixed;
+          bottom: 30px;
+          width: calc(100% - 20px);
+          height: 50px;
+          padding: 0 10px;
+          box-sizing: border-box;
+        }
+
+        #send-button {
+          background-color: #4caf50;
+          border: none;
+          color: white;
+          padding: 5px 10px;
+          text-align: center;
+          text-decoration: none;
+          display: inline-block;
+          font-size: 14px;
+          margin: 0 0 0 10px;
+          cursor: pointer;
+          border-radius: 3px;
+          height: 100%;
+          box-sizing: border-box;
+        }
+
+        #input-box {
+          flex-grow: 1;
+          resize: none;
+          height: 100%;
+          padding: 10px;
+          border: 1px solid #ccc;
+          border-radius: 3px;
+          margin-right: 10px;
+          box-sizing: border-box;
+        }
+
+        .thinking {
+          position: fixed;
+          left: 50%;
+          bottom: 100px;
+          transform: translate(-50%, 0);
+          background-color: #ff9900;
+          color: white;
+          padding: 5px 10px;
+          border-radius: 5px;
+          display: none;
+        }
       </style>
       <script>
+        function escapeHtml(text) {
+          const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;',
+          };
+
+          return text.replace(/[&<>"']/g, function (m) {
+            return map[m];
+          }).replace(/\\n/g, '<br>');
+        }
+
         const vscode = acquireVsCodeApi();
 
         window.addEventListener('message', event => {
           const message = event.data;
+
           if (message.type === 'clearMessages') {
             clearMessages();
           } else if (message.type === 'showThinking') {
@@ -105,10 +219,12 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
             const messageDiv = document.createElement('div');
             messageDiv.className = message.type;
             messageDiv.innerHTML = message.type === 'sent'
-            ? \`<strong>Me:</strong> <span class="timestamp">(\${message.timestamp})</span><br><p>Action: \${message.action}</p>\${message.fileName ? \`<p>File: \${message.fileName}</p>\` : ''}\${message.code ? \`<div class="code" onclick="toggleExpand(this)">\${message.code}</div>\` : ''}\`
-            : \`<strong>ChatGPT:</strong> <span class="timestamp">(\${message.timestamp})</span><br><p>\${message.content}</p>\`;            document.getElementById('messages').appendChild(messageDiv);
+            ? \`<strong>Me:</strong> <span class="timestamp">(\${message.timestamp})</span><br>\${message.fileName ? \`<p>File: \${message.fileName}</p>\` : ''}<p>\${escapeHtml(message.action)}</p>\${message.code ? \`<div class="code" onclick="toggleExpand(this)">\${escapeHtml(message.code)}<span class="expand-collapse">[+]</span></div>\` : ''}\`
+            : \`<strong>ChatGPT:</strong> <span class="timestamp">(\${message.timestamp})</span><br><p>\${message.content}</p>\`;
 
-            window.scrollTo(0, document.body.scrollHeight);
+            document.getElementById('messages').appendChild(messageDiv);
+
+            scrollToBottom();
           }
         });
 
@@ -119,25 +235,49 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
         function showThinking() {
           const thinkingDiv = document.getElementById('thinking');
           thinkingDiv.innerHTML = '<strong>ChatGPT is thinking...</strong>';
+          thinkingDiv.style.display = 'block';
         }
 
         function hideThinking() {
           const thinkingDiv = document.getElementById('thinking');
           thinkingDiv.innerHTML = '';
+          thinkingDiv.style.display = 'none';
         }
 
         function toggleExpand(element) {
-          element.style.whiteSpace = element.style.whiteSpace === 'nowrap' ? 'pre-wrap' : 'nowrap';
+          element.classList.toggle('expanded');
+          const expandSymbol = element.querySelector('.expand-collapse');
+          expandSymbol.textContent = expandSymbol.textContent === '[+]' ? '[-]' : '[+]';
+        }
+
+        function scrollToBottom() {
+          const messagesDiv = document.getElementById('messages');
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
       </script>
     </head>
     <body>
       <div id="messages"></div>
       <div id="thinking" class="thinking"></div>
-    </body>
-    </html>
-    `;
+      <div id="input-box-container">
+        <textarea id="input-box" placeholder="Type your message..."></textarea>
+        <button id="send-button">Send</button>
+      </div>
+      <script>
+        document.getElementById('send-button').addEventListener('click', () => {
+          const inputBox = document.getElementById('input-box');
+          const message = inputBox.value.trim();
+          if (message) {
+            vscode.postMessage({ type: 'inputBoxMessage', content: message });
+            inputBox.value = '';
+          }
+        });
+      </script>
+      </body>
+      </html>
+    `
   }
+
 
   private loadCachedMessages() {
     if (this._view && this.messageCache.length > 0) {
