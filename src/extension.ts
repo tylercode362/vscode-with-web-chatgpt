@@ -219,7 +219,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
             const messageDiv = document.createElement('div');
             messageDiv.className = message.type;
             messageDiv.innerHTML = message.type === 'sent'
-            ? \`<strong>Me:</strong> <span class="timestamp">(\${message.timestamp})</span><br>\${message.fileName ? \`<p>File: \${message.fileName}</p>\` : ''}<p>\${escapeHtml(message.action)}</p>\${message.code ? \`<div class="code" onclick="toggleExpand(this)">\${escapeHtml(message.code)}<span class="expand-collapse">[+]</span></div>\` : ''}\`
+            ? \`<strong>You:</strong> <span class="timestamp">(\${message.timestamp})</span><br>\${message.fileName ? \`<p>File: \${message.fileName}</p>\` : ''}<p>\${escapeHtml(message.action)}</p>\${message.code ? \`<div class="code" onclick="toggleExpand(this)">\${escapeHtml(message.code)}<span class="expand-collapse">[+]</span></div>\` : ''}\`
             : \`<strong>ChatGPT:</strong> <span class="timestamp">(\${message.timestamp})</span><br><p>\${message.content}</p>\`;
 
             document.getElementById('messages').appendChild(messageDiv);
@@ -265,24 +265,38 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       </div>
       <script>
         document.getElementById('send-button').addEventListener('click', () => {
+          submitInput();
+        });
+
+        document.getElementById('input-box').addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            submitInput();
+          }
+        });
+
+        function submitInput() {
           const inputBox = document.getElementById('input-box');
           const message = inputBox.value.trim();
           if (message) {
             vscode.postMessage({ type: 'inputBoxMessage', content: message });
             inputBox.value = '';
           }
-        });
+        }
       </script>
       </body>
       </html>
     `
   }
 
-
   private loadCachedMessages() {
     if (this._view && this.messageCache.length > 0) {
       for (const message of this.messageCache) {
         this._view.webview.postMessage(message);
+      }
+
+      if (this.messageCache[this.messageCache.length - 1].type === 'sent') {
+        this._view.webview.postMessage({ type: 'showThinking' });
       }
     }
   }
