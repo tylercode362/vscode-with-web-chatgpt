@@ -69,7 +69,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
   }
 
   private sanitizeHTML(unsafeHTML: string): string {
-    const allowedTags = ['div', 'code', 'p', 'br', 'ul', 'li', 'pre'];
+    const allowedTags = ['div', 'code', 'p', 'br', 'ul', 'li', 'pre', 'span'];
     const allowedAttributes = ['class'];
 
     return DOMPurify.sanitize(unsafeHTML, {
