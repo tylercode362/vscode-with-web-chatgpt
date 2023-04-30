@@ -9,6 +9,8 @@ const DOMPurify = createDOMPurify(window);
 class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private messageCache: any[] = [];
+  private pendingQueues: any[] = [];
+  private isSending: boolean = false;
 
   constructor(private readonly _extensionUri: vscode.Uri, private readonly _globalState: vscode.Memento) {
     this.messageCache = this._globalState.get("messageCache") || [];
@@ -26,9 +28,11 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       }
 
       this.sendCodeAndDisplayResult(message.content, selectedText, true);
+    }else if(message.type === 'retryLast') {
+      const lastMessage = this.messageCache.slice(-1)[0];
+      this.sendRequest(lastMessage, false);
     }
   }
-
 
 
   public clearMessageCache() {
@@ -189,14 +193,18 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
 
         .thinking {
           position: fixed;
-          left: 50%;
+          left: 30%;
           bottom: 100px;
-          transform: translate(-50%, 0);
+          transform: translate(-30%, 0);
           background-color: #ff9900;
           color: white;
           padding: 5px 10px;
           border-radius: 5px;
           display: none;
+        }
+
+        #retry-button {
+          margin-top:5px;
         }
       </style>
       <script>
@@ -222,9 +230,11 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           if (message.type === 'clearMessages') {
             clearMessages();
           } else if (message.type === 'showThinking') {
-            showThinking();
+            showThinking(message.pendingMessages);
           } else if (message.type === 'hideThinking') {
             hideThinking();
+          }else if (message.type === 'httpError') {
+            showThinking(message.pendingMessages, message.errorMessage);
           } else {
             const messageDiv = document.createElement('div');
             messageDiv.className = message.type;
@@ -242,9 +252,37 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           document.getElementById('messages').innerHTML = '';
         }
 
-        function showThinking() {
+        let thingingRetryTimeout = null;
+
+        function showThinking(pendingMessageLength, errorMessage = "") {
           const thinkingDiv = document.getElementById('thinking');
-          thinkingDiv.innerHTML = '<strong>ChatGPT is thinking...</strong>';
+          let showRetryButtonSec = 10000;
+
+          if (errorMessage != ""){
+            thinkingDiv.innerHTML = \`<strong class="warring">Error: \${errorMessage}</strong>\`;
+            showRetryButtonSec = 1000;
+          } else if (pendingMessageLength === 0) {
+            thinkingDiv.innerHTML = '<strong>ChatGPT is thinking...</strong>';
+          } else {
+            thinkingDiv.innerHTML =\`<strong>ChatGPT is thinking... <br>(pending messages: \${pendingMessageLength})</strong>\`;
+          }
+          thinkingDiv.innerHTML = thinkingDiv.innerHTML + '<button id="retry-button">Retry</button>';
+          document.getElementById('retry-button').style.display = 'none';
+
+          document.getElementById('retry-button').addEventListener('click', () => {
+            vscode.postMessage({ type: 'retryLast' });
+          });
+
+          if (timeoutId) {
+            clearTimeout(thingingRetryTimeout);
+          }
+
+          thingingRetryTimeout = setTimeout(() => {
+            if (document.getElementById('retry-button')) {
+              document.getElementById('retry-button').style.display = 'block';
+            }
+          }, showRetryButtonSec);
+
           thinkingDiv.style.display = 'block';
         }
 
@@ -321,7 +359,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       }
 
       if (this.messageCache[this.messageCache.length - 1].type === 'sent') {
-        this._view.webview.postMessage({ type: 'showThinking' });
+        this._view.webview.postMessage({ type: 'showThinking', pendingMessages: this.pendingQueues.length });
       }
     }
   }
@@ -333,62 +371,97 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
   }
 
   async sendCodeAndDisplayResult(action: string, code?: string, askOnly: boolean = false) {
-    let response;
+    const sentTimestamp = new Date().toLocaleTimeString();
 
     const filePath = vscode.window.activeTextEditor?.document.uri.fsPath;
     const fileName = filePath ? filePath.split('/').pop() : '';
-    let message = "";
 
-    if (code && askOnly === false) {
-      message = `
-      As an engineer,
-      code in "${fileName}",
-      please "${action}" for this code: \n
-      ${code}
-      `
-    }else if (code && askOnly === true){
-      message = `
-      code in "${fileName}" \n
-      ${action} \n
-      code:
-      ${code}
-      `
-    }else{
-      message = action;
+    const sentMessage = { type: 'sent', action: action, code: code || '', fileName: fileName, timestamp: sentTimestamp, askOnly: askOnly };
+    this.pendingQueues.push(sentMessage);
+
+    if (this.isSending === true && this._view) {
+      this._view.webview.postMessage({ type: 'showThinking', pendingMessages: this.pendingQueues.length });
+      return false;
     }
 
-    const sentTimestamp = new Date().toLocaleTimeString();
+    const firstInQueue = this.pendingQueues.shift();
 
-    const sentMessage = { type: 'sent', action: action, code: code || '', fileName: fileName, timestamp: sentTimestamp };
-    this.messageCache.push(sentMessage);
-    this._globalState.update("messageCache", this.messageCache);
+    if (firstInQueue) {
+      await this.sendRequest(firstInQueue);
+    }
+  }
+
+  async sendRequest(message: { type: string; action: string; code: string; fileName: string; timestamp: string, askOnly: boolean }, newMessage: boolean = true) {
+    let messageText = "";
+
+    if (message.code && message.askOnly === false) {
+      messageText = `
+      As an engineer,
+      code in "${message.fileName}",
+      please "${message.action}" for this code: \n
+      ${message.code}
+      `;
+    } else if (message.code && message.askOnly === true) {
+      messageText = `
+      code in "${message.fileName}" \n
+      ${message.action} \n
+      code:
+      ${message.code}
+      `;
+    } else {
+      messageText = message.action;
+    }
+
+    if (newMessage === true) {
+      this.messageCache.push(message);
+      this._globalState.update("messageCache", this.messageCache);
+    }
 
     if (this._view) {
-      this._view.webview.postMessage(sentMessage);
-      this._view.webview.postMessage({ type: 'showThinking' });
+      if (newMessage === true) {
+        this._view.webview.postMessage(message);
+      }
+
+      this._view.webview.postMessage({ type: 'showThinking', pendingMessages: this.pendingQueues.length });
     }
 
-    response = await axios.post('http://localhost:3000/send-message', {
-      message: message
-    });
+    try {
+      this.isSending = true;
 
-    const responseTimestamp = new Date().toLocaleTimeString();
+      const response = await axios.post('http://localhost:3000/send-message', {
+        message: messageText
+      });
 
-    if (response.data && response.data.data) {
-      const receivedMessage = {
-        type: 'received',
-        content: this.sanitizeHTML(response.data.data),
-        timestamp: responseTimestamp,
-      };
+      const responseTimestamp = new Date().toLocaleTimeString();
 
-      this.messageCache.push(receivedMessage);
-      this._globalState.update("messageCache", this.messageCache);
+      if (response.data && response.data.data) {
+        const receivedMessage = {
+          type: 'received',
+          content: this.sanitizeHTML(response.data.data),
+          timestamp: responseTimestamp,
+        };
 
+        this.messageCache.push(receivedMessage);
+        this._globalState.update("messageCache", this.messageCache);
+
+        if (this._view) {
+          this._view.webview.postMessage(receivedMessage);
+          this._view.webview.postMessage({ type: 'hideThinking' });
+        }
+        const firstInQueue = this.pendingQueues.shift();
+
+        if (firstInQueue) {
+          await this.sendRequest(firstInQueue);
+        }
+      }
+    } catch (error: any) {
       if (this._view) {
-        this._view.webview.postMessage(receivedMessage);
-        this._view.webview.postMessage({ type: 'hideThinking' });
+        const errorMessage = error.response.data.message;
+        this._view.webview.postMessage({ type: 'httpError', pendingMessages: this.pendingQueues.length, errorMessage: error.message });
       }
     }
+
+    this.isSending = false;
   }
 }
 
