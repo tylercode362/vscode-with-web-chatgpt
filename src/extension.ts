@@ -17,9 +17,19 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
   public handleWebviewMessage(message: any) {
     if (message.type === 'inputBoxMessage') {
       this.openPanel();
-      this.sendCodeAndDisplayResult(message.content);
+
+      let selectedText = '';
+      const editor = vscode.window.activeTextEditor;
+
+      if (editor) {
+        selectedText = editor.document.getText(editor.selection);
+      }
+
+      this.sendCodeAndDisplayResult(message.content, selectedText, true);
     }
   }
+
+
 
   public clearMessageCache() {
     this.messageCache = [];
@@ -268,10 +278,25 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           submitInput();
         });
 
+        let timeoutId = null;
+
         document.getElementById('input-box').addEventListener('keydown', function (event) {
-          if (event.key === 'Enter') {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+
+          if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
             event.preventDefault();
-            submitInput();
+
+            timeoutId = setTimeout(() => {
+              submitInput();
+            }, 50);
+          }
+        });
+
+        document.getElementById('input-box').addEventListener('keyup', function (event) {
+          if (event.key === 'Enter') {
+            clearTimeout(timeoutId);
           }
         });
 
@@ -307,18 +332,25 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  async sendCodeAndDisplayResult(action: string, code?: string) {
+  async sendCodeAndDisplayResult(action: string, code?: string, askOnly: boolean = false) {
     let response;
 
     const filePath = vscode.window.activeTextEditor?.document.uri.fsPath;
     const fileName = filePath ? filePath.split('/').pop() : '';
     let message = "";
 
-    if (code) {
+    if (code && askOnly === false) {
       message = `
       As an engineer,
       code in "${fileName}",
       please "${action}" for this code: \n
+      ${code}
+      `
+    }else if (code && askOnly === true){
+      message = `
+      code in "${fileName}" \n
+      ${action} \n
+      code:
       ${code}
       `
     }else{
@@ -425,8 +457,15 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('vscode-web-chatgpt.askQuestion', () => {
       vscode.window.showInputBox({ prompt: 'Ask a question to ChatGPT' }).then((question) => {
         if (question) {
+          let selectedText = '';
+          const editor = vscode.window.activeTextEditor;
+
+          if (editor) {
+            selectedText = editor.document.getText(editor.selection);
+          }
+
           viewProvider.openPanel();
-          viewProvider.sendCodeAndDisplayResult(question);
+          viewProvider.sendCodeAndDisplayResult(question, selectedText, true);
         }
       });
     })
