@@ -476,6 +476,15 @@ export function activate(context: vscode.ExtensionContext) {
       viewProvider.clearMessageCache();
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('vscode-web-chatgpt.openPanel', () => {
+      viewProvider.openPanel();
+    })
+  );
+
+  vscode.commands.executeCommand('workbench.view.extension.web-chatgpt-container');
+  vscode.commands.executeCommand('web-chatgpt-panel.focus');
 }
 
 export function deactivate() { }
