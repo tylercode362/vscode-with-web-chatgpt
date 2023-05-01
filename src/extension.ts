@@ -29,8 +29,8 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           }
         }
         break;
-      case 'CancelCurrentRequest':
-        this.cancelRequest();
+      case 'StopCurrentRequest':
+        this.stopRequest();
         break;
     }
   }
@@ -290,8 +290,8 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
             case 'clearMessages':
               clearMessages();
               break;
-            case 'cancel':
-              showThinking(message.pendingMessages, 'Canceling...', true, false);
+            case 'stop':
+              showThinking(message.pendingMessages, 'Stopping...', false, false);
               break;
             case 'showThinking':
               showThinking(message.pendingMessages);
@@ -301,10 +301,10 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
               break;
             case 'error':
               if (message.errorMessage){
-                if(message.errorMessage.match('canceled')) {
-                  showThinking(message.pendingMessages, 'Canceling...', true, false);
+                if(message.errorMessage.match('stoped')) {
+                  showThinking(message.pendingMessages, 'Stopping...', false, false);
                 }else {
-                  showThinking(message.pendingMessages, message.errorMessage, true, false);
+                  showThinking(message.pendingMessages, message.errorMessage, false, false);
                 }
               }
 
@@ -350,7 +350,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
         let thingingRetryTimeout = null;
         let hiddenTimeout = null;
 
-        function showThinking(pendingMessageLength, errorMessage = "", retryButton = true, cancelButton = true, hiddenTimeoutSeconds = null) {
+        function showThinking(pendingMessageLength, errorMessage = "", retryButton = true, stopButton = true, hiddenTimeoutSeconds = null) {
           const thinkingDiv = document.getElementById('thinking');
           let showRetryButtonSec = 10000;
 
@@ -365,14 +365,14 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
             thinkingDiv.innerHTML =\`<strong>ChatGPT is thinking... <br>(pending messages: \${pendingMessageLength})</strong>\`;
           }
 
-          thinkingDiv.innerHTML = thinkingDiv.innerHTML + '<div id="buttonBox"><span><button id="retry-button">Retry</button></span><span><button id="cancel-button">Cancel</button></span></div>';
+          thinkingDiv.innerHTML = thinkingDiv.innerHTML + '<div id="buttonBox"><span><button id="retry-button">Retry</button></span><span><button id="stop-button">Stop</button></span></div>';
 
           if (retryButton === false) {
             document.getElementById('retry-button').style.display = 'none';
           }
 
-          if (cancelButton === false) {
-            document.getElementById('cancel-button').style.display = 'none';
+          if (stopButton === false) {
+            document.getElementById('stop-button').style.display = 'none';
           }
 
           if (retryButton) {
@@ -382,8 +382,8 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
               vscode.postMessage({ type: 'retryLast' });
             });
 
-            document.getElementById('cancel-button').addEventListener('click', () => {
-              vscode.postMessage({ type: 'CancelCurrentRequest' });
+            document.getElementById('stop-button').addEventListener('click', () => {
+              vscode.postMessage({ type: 'StopCurrentRequest' });
             });
 
             if (timeoutId) {
@@ -517,9 +517,9 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async cancelRequest() {
+  private async stopRequest() {
     if(this._view) {
-      this._view.webview.postMessage({ type: 'cancel', pendingMessages: this.pendingQueues.length });
+      this._view.webview.postMessage({ type: 'stop', pendingMessages: this.pendingQueues.length });
     }
 
     try {
@@ -578,7 +578,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
         callbackContent: message.timestamp
       });
 
-      const responseTimestamp = new Date().toLocaleTimeString();
+      const responseTimestamp = Date.now();
 
       if (response.data && response.data.data) {
         const responseData = response.data;
