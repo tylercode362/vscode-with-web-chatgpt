@@ -93,12 +93,14 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           padding: 10px;
           border-radius: 5px;
           margin-bottom: 5px;
+          overflow: auto;
         }
         .received {
           background-color: #404040;
           padding: 10px;
           border-radius: 5px;
           color: #bbbbbb;
+          overflow: auto;
         }
 
         .code {
@@ -159,9 +161,9 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           align-items: stretch;
           position: fixed;
           bottom: 30px;
-          width: calc(100% - 20px);
+          width: cal(100% - 20px);
           height: 50px;
-          padding: 0 10px;
+          padding: 0px 0px;
           box-sizing: border-box;
         }
 
@@ -185,10 +187,10 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           flex-grow: 1;
           resize: none;
           height: 100%;
-          padding: 10px;
+          padding: 5px;
           border: 1px solid #ccc;
           border-radius: 3px;
-          margin-right: 10px;
+          margin-right: 5px;
           box-sizing: border-box;
         }
 
@@ -215,8 +217,56 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
         #buttonBox span {
           float: left
         }
+
+        .bg-black {
+          background-color: black;
+          border-radius: 0.375rem;
+          margin-bottom: 1rem;
+          overflow: auto;
+        }
+
+        .bg-black > div.text-gray-200 {
+          background-color: #333;
+          padding: 3px 3px;
+          display: flex;
+          justify-content: space-between;
+        }
+
+        .bg-black > div.text-gray-200 > div {
+          flex: 1;
+          max-width: 70%;
+        }
+
+        .copyButton {
+          float: right;
+          text-align: right;
+          cursor: pointer
+        }
+
+        .overflow-y-auto {
+          padding: 3px 3px;
+        }
       </style>
       <script>
+        function copyCodeToClipboard(event) {
+          const copyButton = event.target;
+          const bgBlackElement = copyButton.closest('.bg-black');
+          const codeElement = bgBlackElement.querySelector('code');
+
+          if (codeElement) {
+            const textToCopy = codeElement.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+              copyButton.textContent = 'Copied';
+
+              setTimeout(() => {
+                copyButton.textContent = 'Copy';
+              }, 2000);
+            }).catch(err => {
+              console.error('無法複製到剪貼簿:', err);
+            });
+          }
+        }
+
         function escapeHtml(text) {
           const map = {
             '&': '&amp;',
@@ -267,12 +317,23 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
                 chatGPTDiv.className = message.type;
                 chatGPTDiv.innerHTML = chatGPTContent;
                 sentMessageDiv.insertAdjacentElement('afterend', chatGPTDiv);
+
+                const bgBlackElements = chatGPTDiv.querySelectorAll('.bg-black');
+                bgBlackElements.forEach((bgBlackElement) => {
+                  const textGrayElement = bgBlackElement.querySelector('div.text-gray-200');
+                  if (textGrayElement) {
+                    textGrayElement.innerHTML = textGrayElement.innerHTML.replace(/Copy code/g, "<div class='copyButton' style='float: right;'>Copy</div>");
+                    textGrayElement.innerHTML = textGrayElement.innerHTML.replace(/<span>([^<>]*)<\\/span>/g, "<div style='flex: 1; max-width: 70%;'>$1</div>");
+                  }
+
+                  const copyButton = bgBlackElement.querySelector('.copyButton');
+                  if (copyButton) {
+                    copyButton.addEventListener('click', copyCodeToClipboard);
+                  }
+                });
               }
-
-
               scrollToBottom();
           }
-
         });
 
         function clearMessages() {
