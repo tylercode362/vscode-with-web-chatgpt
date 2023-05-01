@@ -19,7 +19,14 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
   public handleWebviewMessage(message: any) {
     switch (message.type) {
       case 'inputBoxMessage':
-        this.sendCodeAndDisplayResult(message.content);
+          let selectedText = '';
+          const editor = vscode.window.activeTextEditor;
+
+          if (editor) {
+            selectedText = editor.document.getText(editor.selection);
+          }
+
+        this.sendCodeAndDisplayResult(message.content, selectedText, true);
         break;
       case 'retryLast':
         if (this.messageCache.length > 0) {
@@ -70,7 +77,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
   }
 
   private sanitizeHTML(unsafeHTML: string): string {
-    const allowedTags = ['div', 'code', 'p', 'br', 'ul', 'li', 'pre', 'span'];
+    const allowedTags = ['div', 'code', 'p', 'br', 'ul', 'ol', 'li', 'pre', 'span'];
     const allowedAttributes = ['class'];
 
     return DOMPurify.sanitize(unsafeHTML, {
@@ -251,6 +258,23 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
 
         .overflow-y-auto {
           padding: 3px 3px;
+        }
+
+        ol {
+          list-style-type: decimal;
+          counter-reset: li;
+          padding-left: 8px;
+        }
+
+        ol ul{
+          padding-left: 10px;
+        }
+
+        ol li {
+          margin-bottom: 5px;
+          margin-left: 0px;
+          padding-left: 0px;
+          position: relative;
         }
       </style>
       <script>
