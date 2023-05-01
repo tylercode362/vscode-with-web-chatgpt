@@ -197,17 +197,23 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
         .thinking {
           position: fixed;
           left: 30%;
-          bottom: 100px;
+          bottom: 90px;
           transform: translate(-30%, 0);
           background-color: #ff9900;
           color: white;
           padding: 5px 10px;
           border-radius: 5px;
           display: none;
+          font-size: 10px;
         }
 
         #retry-button {
           margin-right:5px;
+          font-size: 10px;
+        }
+
+        #stop-button {
+          font-size: 10px;
         }
 
         #buttonBox {
