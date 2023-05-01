@@ -517,32 +517,16 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private cancelNextTask: any;
-  private axiosSource = axios.CancelToken.source();
   private async cancelRequest() {
-    clearTimeout(this.cancelNextTask);
-
     if(this._view) {
       this._view.webview.postMessage({ type: 'cancel', pendingMessages: this.pendingQueues.length });
     }
 
     try {
-      this.axiosSource.cancel('Request canceled by the user.');
-      this.axiosSource = axios.CancelToken.source();
       await axios.post('http://localhost:3000/stop');
     } catch (error) {
       console.error('Error while sending stop request:', error);
     }
-
-    this.cancelNextTask = setTimeout(() => {
-      const firstInQueue = this.pendingQueues.shift();
-      console.log(firstInQueue)
-      if (firstInQueue) {
-        this.sendRequest(firstInQueue);
-      }else if(this._view) {
-        this._view.webview.postMessage({ type: 'hideThinking' });
-      }
-    }, 3000);
   }
 
 
@@ -592,8 +576,6 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       const response = await axios.post('http://localhost:3000/send-message', {
         message: messageText,
         callbackContent: message.timestamp
-      },{
-        cancelToken: this.axiosSource.token
       });
 
       const responseTimestamp = new Date().toLocaleTimeString();
