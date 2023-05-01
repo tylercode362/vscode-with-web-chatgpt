@@ -29,7 +29,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           }
         }
         break;
-      case 'skipCurrentRequest':
+      case 'CancelCurrentRequest':
         this.cancelRequest();
         break;
     }
@@ -262,7 +262,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
                 copyButton.textContent = 'Copy';
               }, 2000);
             }).catch(err => {
-              console.error('無法複製到剪貼簿:', err);
+              console.error('Can not copy:', err);
             });
           }
         }
@@ -291,7 +291,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
               clearMessages();
               break;
             case 'cancel':
-              showThinking(0, 'Canceling...', false);
+              showThinking(message.pendingMessages, 'Canceling...', true, false, 5000);
               break;
             case 'showThinking':
               showThinking(message.pendingMessages);
@@ -300,7 +300,12 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
               hideThinking();
               break;
             case 'error':
-              showThinking(message.pendingMessages, message.errorMessage);
+              if(message.errorMessage.match('canceled')) {
+                showThinking(message.pendingMessages, 'Canceling...', true, false, 5000);
+              }else {
+                showThinking(message.pendingMessages, message.errorMessage, true, false);
+              }
+
               break;
             default:
               const sentTime = new Date(message.timestamp).toLocaleTimeString();
@@ -341,13 +346,16 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
         }
 
         let thingingRetryTimeout = null;
+        let hiddenTimeout = null;
 
-        function showThinking(pendingMessageLength, errorMessage = "", button = true) {
+        function showThinking(pendingMessageLength, errorMessage = "", retryButton = true, cancelButton = true, hiddenTimeoutSeconds = null) {
           const thinkingDiv = document.getElementById('thinking');
           let showRetryButtonSec = 10000;
 
+          clearTimeout(hiddenTimeout)
+
           if (errorMessage != ""){
-            thinkingDiv.innerHTML = \`<strong class="warring">Error: \${errorMessage}</strong>\`;
+            thinkingDiv.innerHTML = \`<strong class="warring">Error: \${errorMessage} <br>(pending messages: \${pendingMessageLength})</strong>\`;
             showRetryButtonSec = 1000;
           } else if (pendingMessageLength === 0) {
             thinkingDiv.innerHTML = '<strong>ChatGPT is thinking...</strong>';
@@ -355,16 +363,25 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
             thinkingDiv.innerHTML =\`<strong>ChatGPT is thinking... <br>(pending messages: \${pendingMessageLength})</strong>\`;
           }
 
-          if (button) {
-            thinkingDiv.innerHTML = thinkingDiv.innerHTML + '<div id="buttonBox"><span><button id="retry-button">Retry</button></span><span><button id="skip-button">Skip</button></span></div>';
+          thinkingDiv.innerHTML = thinkingDiv.innerHTML + '<div id="buttonBox"><span><button id="retry-button">Retry</button></span><span><button id="cancel-button">Cancel</button></span></div>';
+
+          if (retryButton === false) {
             document.getElementById('retry-button').style.display = 'none';
+          }
+
+          if (cancelButton === false) {
+            document.getElementById('cancel-button').style.display = 'none';
+          }
+
+          if (retryButton) {
+           document.getElementById('retry-button').style.display = 'none';
 
             document.getElementById('retry-button').addEventListener('click', () => {
               vscode.postMessage({ type: 'retryLast' });
             });
 
-            document.getElementById('skip-button').addEventListener('click', () => {
-              vscode.postMessage({ type: 'skipCurrentRequest' });
+            document.getElementById('cancel-button').addEventListener('click', () => {
+              vscode.postMessage({ type: 'CancelCurrentRequest' });
             });
 
             if (timeoutId) {
@@ -381,6 +398,10 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           }
 
           thinkingDiv.style.display = 'block';
+
+          if (hiddenTimeoutSeconds) {
+            hiddenTimeout = setTimeout(() => { hideThinking() }, hiddenTimeoutSeconds)
+          }
         }
 
         function hideThinking() {
@@ -446,7 +467,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       </script>
       </body>
       </html>
-    `
+    `;
   }
 
   private loadCachedMessages() {
@@ -494,10 +515,13 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private cancelNextTask: any;
   private axiosSource = axios.CancelToken.source();
   private async cancelRequest() {
+    clearTimeout(this.cancelNextTask);
+
     if(this._view) {
-      this._view.webview.postMessage({ type: 'cancel' });
+      this._view.webview.postMessage({ type: 'cancel', pendingMessages: this.pendingQueues.length });
     }
 
     try {
@@ -508,9 +532,10 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       console.error('Error while sending stop request:', error);
     }
 
-
-    setTimeout(() => {
+    console.log('eeeeeeee')
+    this.cancelNextTask = setTimeout(() => {
       const firstInQueue = this.pendingQueues.shift();
+      console.log(firstInQueue)
       if (firstInQueue) {
         this.sendRequest(firstInQueue);
       }else if(this._view) {
