@@ -291,7 +291,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
               clearMessages();
               break;
             case 'cancel':
-              showThinking(message.pendingMessages, 'Canceling...', true, false, 5000);
+              showThinking(message.pendingMessages, 'Canceling...', true, false);
               break;
             case 'showThinking':
               showThinking(message.pendingMessages);
@@ -300,10 +300,12 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
               hideThinking();
               break;
             case 'error':
-              if(message.errorMessage.match('canceled')) {
-                showThinking(message.pendingMessages, 'Canceling...', true, false, 5000);
-              }else {
-                showThinking(message.pendingMessages, message.errorMessage, true, false);
+              if (message.errorMessage){
+                if(message.errorMessage.match('canceled')) {
+                  showThinking(message.pendingMessages, 'Canceling...', true, false);
+                }else {
+                  showThinking(message.pendingMessages, message.errorMessage, true, false);
+                }
               }
 
               break;
@@ -532,7 +534,6 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       console.error('Error while sending stop request:', error);
     }
 
-    console.log('eeeeeeee')
     this.cancelNextTask = setTimeout(() => {
       const firstInQueue = this.pendingQueues.shift();
       console.log(firstInQueue)
