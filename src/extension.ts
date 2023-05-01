@@ -17,20 +17,21 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
   }
 
   public handleWebviewMessage(message: any) {
-    if (message.type === 'inputBoxMessage') {
-      this.openPanel();
-
-      let selectedText = '';
-      const editor = vscode.window.activeTextEditor;
-
-      if (editor) {
-        selectedText = editor.document.getText(editor.selection);
-      }
-
-      this.sendCodeAndDisplayResult(message.content, selectedText, true);
-    }else if(message.type === 'retryLast') {
-      const lastMessage = this.messageCache.slice(-1)[0];
-      this.sendRequest(lastMessage, false);
+    switch (message.type) {
+      case 'inputBoxMessage':
+        this.sendCodeAndDisplayResult(message.content);
+        break;
+      case 'retryLast':
+        if (this.messageCache.length > 0) {
+          const lastSent = this.messageCache[this.messageCache.length - 1];
+          if (lastSent.type === 'sent') {
+            this.sendRequest(lastSent, false);
+          }
+        }
+        break;
+      case 'skipCurrentRequest':
+        this.cancelRequest();
+        break;
     }
   }
 
@@ -204,7 +205,15 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
         }
 
         #retry-button {
+          margin-right:5px;
+        }
+
+        #buttonBox {
           margin-top:5px;
+        }
+
+        #buttonBox span {
+          float: left
         }
       </style>
       <script>
@@ -227,25 +236,43 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
         window.addEventListener('message', event => {
           const message = event.data;
 
-          if (message.type === 'clearMessages') {
-            clearMessages();
-          } else if (message.type === 'showThinking') {
-            showThinking(message.pendingMessages);
-          } else if (message.type === 'hideThinking') {
-            hideThinking();
-          }else if (message.type === 'httpError') {
-            showThinking(message.pendingMessages, message.errorMessage);
-          } else {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = message.type;
-            messageDiv.innerHTML = message.type === 'sent'
-            ? \`<strong>You:</strong> <span class="timestamp">(\${message.timestamp})</span><br>\${message.fileName ? \`<p>File: \${message.fileName}</p>\` : ''}<p>\${escapeHtml(message.action)}</p>\${message.code ? \`<div class="code" onclick="toggleExpand(this)">\${escapeHtml(message.code)}<span class="expand-collapse">[+]</span></div>\` : ''}\`
-            : \`<strong>ChatGPT:</strong> <span class="timestamp">(\${message.timestamp})</span><br><p>\${message.content}</p>\`;
+          switch (message.type) {
+            case 'clearMessages':
+              clearMessages();
+              break;
+            case 'cancel':
+              showThinking(0, 'Canceling...', false);
+              break;
+            case 'showThinking':
+              showThinking(message.pendingMessages);
+              break;
+            case 'hideThinking':
+              hideThinking();
+              break;
+            case 'error':
+              showThinking(message.pendingMessages, message.errorMessage);
+              break;
+            default:
+              const sentTime = new Date(message.timestamp).toLocaleTimeString();
 
-            document.getElementById('messages').appendChild(messageDiv);
+              if (message.type === 'sent') {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = message.type;
+                messageDiv.innerHTML = \`<div id="sent\${message.timestamp}"><strong>You:</strong> <span class="timestamp">(\${sentTime})</span><br>\${message.fileName ? \`<p>File: \${message.fileName}</p>\` : ''}<p>\${escapeHtml(message.action)}</p>\${message.code ? \`<div class="code" onclick="toggleExpand(this)">\${escapeHtml(message.code)}<span class="expand-collapse">[+]</span></div>\` : ''}</div>\`;
+                document.getElementById('messages').appendChild(messageDiv);
+              } else {
+                const chatGPTContent = \`<div><strong>ChatGPT:</strong> <span class="timestamp">(\${sentTime})</span><br><p>\${message.content}</p></div>\`;
+                const sentMessageDiv = document.getElementById(\`sent\${message.callbackContent}\`).parentElement;
+                const chatGPTDiv = document.createElement('div');
+                chatGPTDiv.className = message.type;
+                chatGPTDiv.innerHTML = chatGPTContent;
+                sentMessageDiv.insertAdjacentElement('afterend', chatGPTDiv);
+              }
 
-            scrollToBottom();
+
+              scrollToBottom();
           }
+
         });
 
         function clearMessages() {
@@ -254,7 +281,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
 
         let thingingRetryTimeout = null;
 
-        function showThinking(pendingMessageLength, errorMessage = "") {
+        function showThinking(pendingMessageLength, errorMessage = "", button = true) {
           const thinkingDiv = document.getElementById('thinking');
           let showRetryButtonSec = 10000;
 
@@ -266,22 +293,31 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           } else {
             thinkingDiv.innerHTML =\`<strong>ChatGPT is thinking... <br>(pending messages: \${pendingMessageLength})</strong>\`;
           }
-          thinkingDiv.innerHTML = thinkingDiv.innerHTML + '<button id="retry-button">Retry</button>';
-          document.getElementById('retry-button').style.display = 'none';
 
-          document.getElementById('retry-button').addEventListener('click', () => {
-            vscode.postMessage({ type: 'retryLast' });
-          });
+          if (button) {
+            thinkingDiv.innerHTML = thinkingDiv.innerHTML + '<div id="buttonBox"><span><button id="retry-button">Retry</button></span><span><button id="skip-button">Skip</button></span></div>';
+            document.getElementById('retry-button').style.display = 'none';
 
-          if (timeoutId) {
+            document.getElementById('retry-button').addEventListener('click', () => {
+              vscode.postMessage({ type: 'retryLast' });
+            });
+
+            document.getElementById('skip-button').addEventListener('click', () => {
+              vscode.postMessage({ type: 'skipCurrentRequest' });
+            });
+
+            if (timeoutId) {
+              clearTimeout(thingingRetryTimeout);
+            }
+
+            thingingRetryTimeout = setTimeout(() => {
+              if (document.getElementById('retry-button')) {
+                document.getElementById('retry-button').style.display = 'block';
+              }
+            }, showRetryButtonSec);
+          }else {
             clearTimeout(thingingRetryTimeout);
           }
-
-          thingingRetryTimeout = setTimeout(() => {
-            if (document.getElementById('retry-button')) {
-              document.getElementById('retry-button').style.display = 'block';
-            }
-          }, showRetryButtonSec);
 
           thinkingDiv.style.display = 'block';
         }
@@ -371,12 +407,18 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
   }
 
   async sendCodeAndDisplayResult(action: string, code?: string, askOnly: boolean = false) {
-    const sentTimestamp = new Date().toLocaleTimeString();
+    const sentTimestamp = Date.now();
 
     const filePath = vscode.window.activeTextEditor?.document.uri.fsPath;
     const fileName = filePath ? filePath.split('/').pop() : '';
 
     const sentMessage = { type: 'sent', action: action, code: code || '', fileName: fileName, timestamp: sentTimestamp, askOnly: askOnly };
+
+    if (sentMessage.action === '' && this._view) {
+      this._view.webview.postMessage({ type: 'error', pendingMessages: this.pendingQueues.length, errorMessage: 'The message is empty. Please provide a valid input.' });
+      return false;
+    }
+
     this.pendingQueues.push(sentMessage);
 
     if (this.isSending === true && this._view) {
@@ -391,8 +433,40 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private axiosSource = axios.CancelToken.source();
+  private async cancelRequest() {
+    if(this._view) {
+      this._view.webview.postMessage({ type: 'cancel' });
+    }
+
+    try {
+      this.axiosSource.cancel('Request canceled by the user.');
+      this.axiosSource = axios.CancelToken.source();
+      await axios.post('http://localhost:3000/stop');
+    } catch (error) {
+      console.error('Error while sending stop request:', error);
+    }
+
+
+    setTimeout(() => {
+      const firstInQueue = this.pendingQueues.shift();
+      if (firstInQueue) {
+        this.sendRequest(firstInQueue);
+      }else if(this._view) {
+        this._view.webview.postMessage({ type: 'hideThinking' });
+      }
+    }, 3000);
+  }
+
+
   async sendRequest(message: { type: string; action: string; code: string; fileName: string; timestamp: string, askOnly: boolean }, newMessage: boolean = true) {
     let messageText = "";
+
+    await new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(true);
+      }, 300);
+    });
 
     if (message.code && message.askOnly === false) {
       messageText = `
@@ -429,16 +503,21 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       this.isSending = true;
 
       const response = await axios.post('http://localhost:3000/send-message', {
-        message: messageText
+        message: messageText,
+        callbackContent: message.timestamp
+      },{
+        cancelToken: this.axiosSource.token
       });
 
       const responseTimestamp = new Date().toLocaleTimeString();
 
       if (response.data && response.data.data) {
+        const responseData = response.data;
         const receivedMessage = {
           type: 'received',
-          content: this.sanitizeHTML(response.data.data),
+          content: this.sanitizeHTML(responseData.data),
           timestamp: responseTimestamp,
+          callbackContent: responseData.callbackContent
         };
 
         this.messageCache.push(receivedMessage);
@@ -456,8 +535,8 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       }
     } catch (error: any) {
       if (this._view) {
-        const errorMessage = error.response.data.message;
-        this._view.webview.postMessage({ type: 'httpError', pendingMessages: this.pendingQueues.length, errorMessage: error.message });
+        const errorMessage = error.response ? error.response.data.message : error.message;
+        this._view.webview.postMessage({ type: 'error', pendingMessages: this.pendingQueues.length, errorMessage: errorMessage });
       }
     }
 
