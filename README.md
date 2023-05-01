@@ -13,7 +13,7 @@ The VSCode Web ChatGPT Extension is a useful tool for code explanation, refactor
 
 - Right-click context menu integration for quick access to actions like "Explain", "Refactor", and "Generate Documentation".
 - Displays the output of the selected action in a dedicated panel within the editor.
-- Communicates with a local server running on `http://localhost:3000/send-message` ( run with [API Bridge Chrome Extension for ChatGPT(Web)](https://github.com/tylercode362/Chrome-extension-ChatGPT-API))
+- Communicates with a local server running on `http://localhost:3000/send-message` ( from [API Bridge Chrome Extension for ChatGPT(Web)](https://github.com/tylercode362/Chrome-extension-ChatGPT-API))
 
 ## Installation
 
