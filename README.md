@@ -18,7 +18,13 @@ The VSCode Web ChatGPT Extension is a useful tool for code explanation, refactor
 
 ## Requirements
 
-- A local ChatGPT service running on `http://localhost:3000/send-message`.
+Install API Bridge Chrome Extension for ChatGPT(Web)
+
+https://github.com/tylercode362/Chrome-extension-ChatGPT-API
+
+An innovative browser extension designed to enable smooth communication with chat.openai.com through WebSockets. This extension allows users to engage with the chat interface by sending messages and receiving replies via a WebSocket server, offering a streamlined and user-friendly experience.
+
+This WebSocket API Bridge Extension is compatible with both ChatGPT Plus (including GPT-3.5 and GPT-4) and the Free Version, ensuring accessibility for a diverse user base.
 
 ## Usage
 
