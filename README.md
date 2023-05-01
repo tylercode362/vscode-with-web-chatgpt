@@ -1,6 +1,6 @@
 # VSCode Web ChatGPT Extension
 
-The VSCode Web ChatGPT Extension is a useful tool for code explanation, refactoring, and documentation generation. By integrating with a locally running ChatGPT service, it allows users to easily obtain explanations for selected code snippets, suggested refactoring, and relevant documentation.
+The VSCode Web ChatGPT Extension is a useful tool for code explanation, refactoring, and documentation generation. By integrating with a ChatGPT web, it allows users to easily obtain explanations for selected code snippets, suggested refactoring, and relevant documentation.
 
 ![image](https://user-images.githubusercontent.com/22150402/235414828-135282d1-1f5a-475d-8a47-cba0d66995b4.png)
 
