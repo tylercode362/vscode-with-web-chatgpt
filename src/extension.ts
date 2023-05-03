@@ -353,6 +353,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
                 const chatGPTDiv = document.createElement('div');
                 chatGPTDiv.className = message.type;
                 chatGPTDiv.innerHTML = chatGPTContent;
+                chatGPTContent.id = \`received\${message.callbackContent}\`
                 sentMessageDiv.insertAdjacentElement('afterend', chatGPTDiv);
 
                 const bgBlackElements = chatGPTDiv.querySelectorAll('.bg-black');
