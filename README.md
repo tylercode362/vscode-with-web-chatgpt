@@ -1,12 +1,19 @@
 # VSCode Web ChatGPT Extension
 
-The VSCode Web ChatGPT Extension is a useful tool for code explanation, refactoring, and documentation generation. By integrating with a locally running ChatGPT service, it allows users to easily obtain explanations for selected code snippets, suggested refactoring, and relevant documentation.
+The VSCode Web ChatGPT Extension is a useful tool for code explanation, refactoring, and documentation generation. By integrating with a ChatGPT web (without the api key), it allows users to easily obtain explanations for selected code snippets, suggested refactoring, and relevant documentation.
+
+![image](https://user-images.githubusercontent.com/22150402/235414828-135282d1-1f5a-475d-8a47-cba0d66995b4.png)
+
+![image](https://user-images.githubusercontent.com/22150402/235414899-93ce3066-b6be-480e-857e-ed7cb0b71949.png)
+
+![image](https://user-images.githubusercontent.com/22150402/235414852-3c5f8d29-a69f-4871-908d-4eedc35cec73.png)
+
 
 ## Features
 
 - Right-click context menu integration for quick access to actions like "Explain", "Refactor", and "Generate Documentation".
 - Displays the output of the selected action in a dedicated panel within the editor.
-- Communicates with a local server running on `http://localhost:3000/send-message`.
+- Communicates with a local server running on `http://localhost:3000/send-message` ( from [API Bridge Chrome Extension for ChatGPT(Web)](https://github.com/tylercode362/Chrome-extension-ChatGPT-API))
 
 ## Installation
 
@@ -18,7 +25,13 @@ The VSCode Web ChatGPT Extension is a useful tool for code explanation, refactor
 
 ## Requirements
 
-- A local ChatGPT service running on `http://localhost:3000/send-message`.
+Install API Bridge Chrome Extension for ChatGPT(Web)
+
+https://github.com/tylercode362/Chrome-extension-ChatGPT-API
+
+An innovative browser extension designed to enable smooth communication with chat.openai.com through WebSockets. This extension allows users to engage with the chat interface by sending messages and receiving replies via a WebSocket server, offering a streamlined and user-friendly experience.
+
+This WebSocket API Bridge Extension is compatible with both ChatGPT Plus (including GPT-3.5 and GPT-4) and the Free Version, ensuring accessibility for a diverse user base.
 
 ## Usage
 
