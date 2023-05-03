@@ -94,17 +94,21 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
+        body {
+          padding: 0px;
+          margin: 0px;
+        }
         .sent {
           background-color: #262626;
           color: #bbbbbb;
-          padding: 10px;
+          padding: 5px;
           border-radius: 5px;
           margin-bottom: 5px;
           overflow: auto;
         }
         .received {
           background-color: #404040;
-          padding: 10px;
+          padding: 5px;
           border-radius: 5px;
           color: #bbbbbb;
           overflow: auto;
@@ -168,9 +172,10 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
           align-items: stretch;
           position: fixed;
           bottom: 30px;
-          width: cal(100% - 20px);
+          width: calc(100% - 20px);
           height: 50px;
           padding: 0px 0px;
+          padding-left: 10px;
           box-sizing: border-box;
         }
 
@@ -263,7 +268,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
         ol {
           list-style-type: decimal;
           counter-reset: li;
-          padding-left: 8px;
+          padding-left: 15px;
         }
 
         ol ul{
