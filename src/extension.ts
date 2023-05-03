@@ -344,12 +344,13 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
 
               if (message.type === 'sent') {
                 const messageDiv = document.createElement('div');
+                messageDiv.id = \`sent\${message.timestamp}\`
                 messageDiv.className = message.type;
-                messageDiv.innerHTML = \`<div id="sent\${message.timestamp}"><strong>You:</strong> <span class="timestamp">(\${sentTime})</span><br>\${message.fileName ? \`<p>File: \${message.fileName}</p>\` : ''}<p>\${escapeHtml(message.action)}</p>\${message.code ? \`<div class="code" onclick="toggleExpand(this)">\${escapeHtml(message.code)}<span class="expand-collapse">[+]</span></div>\` : ''}</div>\`;
+                messageDiv.innerHTML = \`<div><strong>You:</strong> <span class="timestamp">(\${sentTime})</span><br>\${message.fileName ? \`<p>File: \${message.fileName}</p>\` : ''}<p>\${escapeHtml(message.action)}</p>\${message.code ? \`<div class="code" onclick="toggleExpand(this)">\${escapeHtml(message.code)}<span class="expand-collapse">[+]</span></div>\` : ''}</div>\`;
                 document.getElementById('messages').appendChild(messageDiv);
               } else {
                 const chatGPTContent = \`<div><strong>ChatGPT:</strong> <span class="timestamp">(\${sentTime})</span><br><p>\${message.content}</p></div>\`;
-                const sentMessageDiv = document.getElementById(\`sent\${message.callbackContent}\`).parentElement;
+                const sentMessageDiv = document.getElementById(\`sent\${message.callbackContent}\`);
                 const chatGPTDiv = document.createElement('div');
                 chatGPTDiv.className = message.type;
                 chatGPTDiv.innerHTML = chatGPTContent;
