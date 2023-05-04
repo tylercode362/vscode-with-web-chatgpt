@@ -560,7 +560,9 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      await axios.post('http://localhost:3030/stop');
+      await axios.post('http://localhost:3030/stop', {}, {
+        timeout: 10000
+      });
     } catch (error) {
       console.error('Error while sending stop request:', error);
     }
