@@ -560,7 +560,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      await axios.post('http://localhost:3000/stop');
+      await axios.post('http://localhost:3030/stop');
     } catch (error) {
       console.error('Error while sending stop request:', error);
     }
@@ -610,7 +610,7 @@ class WebChatGPTViewProvider implements vscode.WebviewViewProvider {
     try {
       this.isSending = true;
 
-      const response = await axios.post('http://localhost:3000/send-message', {
+      const response = await axios.post('http://localhost:3030/send-message', {
         message: messageText,
         callbackContent: message.timestamp
       });
